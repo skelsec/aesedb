@@ -362,7 +362,7 @@ class ESENT_DB:
 					if err is not None:
 						raise err
 					cursor['CurrentTag'] = 0
-					return await self.get_next_row(cursor)
+					return await self.get_next_row(cursor, filter_col = filter_col)
 			else:
 				res, err = await self.__tag_to_record(cursor, tag.EntryData, filter_col)
 				if err is not None:
