@@ -24,6 +24,11 @@ try:
 except:
 	pass
 
+try:
+	from mbedtls import cipher as mbedcipher
+except:
+	pass
+
 class pureRC4(symmetricBASE):
 	def __init__(self, key):
 		if not isinstance(key, bytes):
@@ -86,3 +91,19 @@ class cryptographyRC4(symmetricBASE):
 		return self.encryptor.update(data)
 	def decrypt(self, data):
 		return self.decryptor.update(data)
+
+
+class mbedtlsRC4(symmetricBASE):
+	def __init__(self, key):
+		if not isinstance(key, bytes):
+			raise Exception('Key needs to be bytes!')
+		self.key = key
+		symmetricBASE.__init__(self)
+
+	def setup_cipher(self):
+		self._cipher = mbedcipher.ARC4.new(self.key, mbedcipher.MODE_ECB, b'')
+
+	def encrypt(self, data):
+		return self._cipher.encrypt(data)
+	def decrypt(self, data):
+		return self._cipher.decrypt(data)

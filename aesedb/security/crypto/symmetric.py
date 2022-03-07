@@ -4,10 +4,10 @@ import importlib.util
 #
 ##key = name of the cipher, value=list of module names, in order of preference
 preftable = {
-	'DES' : ['pyCryptodome','pyCrypto','pure'], 
-	'TDES': ['pyCryptodome','pyCrypto','pure'], 
-	'AES' : ['pyCryptodome','cryptography','pyCrypto','pure'], 
-	'RC4' : ['pyCryptodome','cryptography','pyCrypto','pure'],
+	'DES' : ['pyCryptodome','pyCrypto','mbedtls', 'pure'], 
+	'TDES': ['pyCryptodome','pyCrypto','mbedtls', 'pure'], 
+	'AES' : ['pyCryptodome','cryptography','pyCrypto','mbedtls', 'pure'], 
+	'RC4' : ['pyCryptodome','cryptography','pyCrypto','mbedtls', 'pure'],
 }
 
 #
@@ -24,6 +24,10 @@ if importlib.util.find_spec("pyCrypto") is not None:
 if importlib.util.find_spec("Cryptodome") is not None:
 	#print('Found cryptography package!')
 	available_modules.append("pyCryptodome")
+
+if importlib.util.find_spec("mbedtls") is not None:
+	#print('Found cryptography package!')
+	available_modules.append("mbedtls")
 
 #print(available_modules)
 

@@ -24,6 +24,10 @@ try:
 except:
 	pass
 
+try:
+	from mbedtls import cipher as mbedcipher
+except:
+	pass
 
 # from impacket
 def expand_DES_key(key):
@@ -125,3 +129,26 @@ class pyCryptoDES(symmetricBASE):
 	def decrypt(self, data):
 		return self._cipher.decrypt(data)
 
+
+class mbedtlsDES(symmetricBASE):
+	def __init__(self, key, mode = cipherMODE.ECB, IV = None):
+		self.key = key
+		if len(key) == 7:
+			self.key = expand_DES_key(key)
+
+		self.mode = mode
+		self.IV = IV
+		symmetricBASE.__init__(self)
+
+	def setup_cipher(self):
+		if self.mode == cipherMODE.ECB:
+			self._cipher = mbedcipher.DES.new(self.key, mbedcipher.MODE_ECB, b'')
+		elif self.mode == cipherMODE.CBC:
+			self._cipher = mbedcipher.DES.new(self.key, mbedcipher.MODE_CBC, self.IV)
+		else:
+			raise Exception('Unknown cipher mode!')
+
+	def encrypt(self, data):
+		return self._cipher.encrypt(data)
+	def decrypt(self, data):
+		return self._cipher.decrypt(data)

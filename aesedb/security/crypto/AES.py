@@ -26,6 +26,11 @@ try:
 except:
 	pass
 
+try:
+	from mbedtls import cipher as mbedcipher
+except:
+	pass
+
 class pureAES(symmetricBASE):
 	def __init__(self, key, mode = cipherMODE.ECB, IV = None, nonce = None, pad = None, padMode = None, segment_size = 8):
 		self.key = key
@@ -151,6 +156,29 @@ class pyCryptodomeAES(symmetricBASE):
 			self._cipher = _pyCryptodomeAES.new(self.key, _pyCryptodomeAES.MODE_CBC, iv=self.IV)
 		elif self.mode == cipherMODE.CTR:
 			self._cipher = _pyCryptodomeAES.new(self.key, _pyCryptodomeAES.MODE_CTR, iv=self.IV)
+		else:
+			raise Exception('Unknown cipher mode!')
+		
+	def encrypt(self, data):
+		return self._cipher.encrypt(data)
+	def decrypt(self, data):
+		return self._cipher.decrypt(data)
+
+
+class mbedtlsAES(symmetricBASE):
+	def __init__(self, key, mode = cipherMODE.ECB, IV = None):
+		self.key = key
+		self.mode = mode
+		self.IV = IV
+		symmetricBASE.__init__(self)
+
+	def setup_cipher(self):
+		if self.mode == cipherMODE.ECB:
+			self._cipher = mbedcipher.AES.new(self.key, mbedcipher.MODE_ECB, b'')
+		elif self.mode == cipherMODE.CBC:
+			self._cipher = mbedcipher.AES.new(self.key, mbedcipher.MODE_CBC, self.IV)
+		elif self.mode == cipherMODE.CTR:
+			self._cipher = mbedcipher.AES.new(self.key, mbedcipher.MODE_CTR, self.IV)
 		else:
 			raise Exception('Unknown cipher mode!')
 		
