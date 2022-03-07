@@ -8,12 +8,13 @@ from aiowinreg.ahive import AIOWinRegHive
 from aesedb import logger
 
 class NTDSParserConsole:
-	def __init__(self, bootkey, ntdsfile, show_progress = True, outfile = None, ext_result_q = None):
+	def __init__(self, bootkey, ntdsfile, show_progress = True, outfile = None, ext_result_q = None, count_total = True):
 		self.bootkey = bootkey
 		self.ntdsfile = ntdsfile
 		self.show_progress = show_progress
 		self.outfile = outfile
 		self.ext_result_q = ext_result_q
+		self.count_total = count_total
 		self.buffer_size = 100
 		self.buffer = []
 
@@ -63,11 +64,13 @@ class NTDSParserConsole:
 			_, err = await db.parse()
 			if err is not None:
 				raise err
-
-			logger.debug('Fetching total row count')
-			total, err = await db.get_rowcnt('datatable')
-			if err is not None:
-				raise err
+			
+			total = 1
+			if self.count_total is True:
+				logger.debug('Fetching total row count')
+				total, err = await db.get_rowcnt('datatable')
+				if err is not None:
+					raise err
 			
 			ntds = NTDS(db, bootkey)
 			if self.show_progress is True:
