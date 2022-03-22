@@ -1,15 +1,14 @@
 
 import asyncio
 from collections import OrderedDict
+from unicrypto.symmetric import RC4, AES, DES, MODE_CBC, MODE_ECB, deriveKey
+from unicrypto.hashlib import md5
+
 from aesedb.security.constants import NAME_TO_INTERNAL, ACCOUNT_TYPES, KERBEROS_TYPE
 from aesedb.security.structures.pek import PEKLIST_ENC, PEK_KEY, PEKLIST_PLAIN
 from aesedb.security.structures.crypted import CRYPTED_HASH, CRYPTED_HASHW16, CRYPTED_HISTORY, CRYPTED_BLOB
 from aesedb.security.structures.userprops import USER_PROPERTIES
 from aesedb.security.structures.kerbsecret import KERB_STORED_CREDENTIAL_NEW, KERB_KEY_DATA_NEW
-from aesedb.security.crypto.symmetric import RC4, AES, DES
-from aesedb.security.crypto.hashing import md5
-from aesedb.security.crypto.BASE import cipherMODE
-from aesedb.security.crypto.DES import deriveKey
 from aesedb.security.structures.sid import SAMR_RPC_SID
 from aesedb.security.common.usersecret import UserSecrets
 from aesedb import logger
@@ -104,7 +103,7 @@ class NTDS:
 				# Key: the bootKey
 				# CipherText: PEKLIST_ENC['EncryptedPek']
 				# IV: PEKLIST_ENC['KeyMaterial']
-				ctx = AES(self.bootkey, cipherMODE.CBC, IV=peklist_enc.KeyMaterial)
+				ctx = AES(self.bootkey, MODE_CBC, IV=peklist_enc.KeyMaterial)
 				dec_pek = ctx.decrypt(peklist_enc.EncryptedPek)
 				peklist = PEKLIST_PLAIN.from_bytes(dec_pek)
 
@@ -131,8 +130,8 @@ class NTDS:
 	
 	def __removeDESLayer(self, cryptedHash, rid):
 		Key1,Key2 = deriveKey(int(rid))
-		Crypt1 = DES(Key1, cipherMODE.ECB)
-		Crypt2 = DES(Key2, cipherMODE.ECB)
+		Crypt1 = DES(Key1, MODE_ECB)
+		Crypt2 = DES(Key2, MODE_ECB)
 		decryptedHash = Crypt1.decrypt(cryptedHash[:8]) + Crypt2.decrypt(cryptedHash[8:])
 		return decryptedHash
 	
@@ -154,7 +153,7 @@ class NTDS:
 			return 'never'
 		else:
 			dt = datetime.datetime.fromtimestamp(t)
-			return dt.strftime("%Y-%m-%d %H:%M")
+			return dt.strftime("%Y-%m-%d %H-%M")
 	
 	def __decrypt_hash(self, secret: UserSecrets, record, db_cursor, with_history = True):
 		try:
@@ -166,6 +165,7 @@ class NTDS:
 				print('Data inpuit: %s' % record[NAME_TO_INTERNAL['objectSid']].hex())
 				raise e
 			secret.object_sid = sid
+			#secret.rid = rid
 
 			if record[NAME_TO_INTERNAL['dBCSPwd']] is not None:
 				encryptedLMHash = CRYPTED_HASH.from_bytes(record[self.NAME_TO_INTERNAL['dBCSPwd']])
@@ -173,7 +173,7 @@ class NTDS:
 					# Win2016 TP4 decryption is different
 					encryptedLMHash = CRYPTED_HASHW16(record[self.NAME_TO_INTERNAL['dBCSPwd']])
 					pekIndex = encryptedLMHash.Header[4]
-					ctx = AES(self.__PEK[pekIndex], cipherMODE.CBC, IV=encryptedLMHash.KeyMaterial)
+					ctx = AES(self.__PEK[pekIndex], MODE_CBC, IV=encryptedLMHash.KeyMaterial)
 					dec_hash_temp = ctx.decrypt(encryptedLMHash.EncryptedHash[:16])
 				else:
 					dec_hash_temp = self.__removeRC4Layer(encryptedLMHash)
@@ -187,7 +187,7 @@ class NTDS:
 					# Win2016 TP4 decryption is different
 					encryptedNTHash = CRYPTED_HASHW16.from_bytes(record[NAME_TO_INTERNAL['unicodePwd']])
 					pekIndex = encryptedNTHash.Header[4]
-					ctx = AES(self.__PEK[pekIndex], cipherMODE.CBC, IV=encryptedNTHash.KeyMaterial)
+					ctx = AES(self.__PEK[pekIndex], MODE_CBC, IV=encryptedNTHash.KeyMaterial)
 					dec_hash_temp = ctx.decrypt(encryptedNTHash.EncryptedHash[:16])
 				else:
 					dec_hash_temp = self.__removeRC4Layer(encryptedNTHash)
@@ -225,7 +225,7 @@ class NTDS:
 					# Win2016 TP4 decryption is different
 					encryptedNTHistory = CRYPTED_HASHW16.from_bytes(record[NAME_TO_INTERNAL['ntPwdHistory']])
 					pekIndex = encryptedNTHistory.Header[4]
-					ctx = AES(self.__PEK[pekIndex], cipherMODE.CBC, IV=encryptedNTHistory.KeyMaterial)
+					ctx = AES(self.__PEK[pekIndex], MODE_CBC, IV=encryptedNTHistory.KeyMaterial)
 					dec_hash_temp = ctx.decrypt(encryptedNTHistory.EncryptedHash)
 				else:
 					dec_hash_temp = self.__removeRC4Layer(encryptedNTHistory)
@@ -247,7 +247,7 @@ class NTDS:
 					if cipherText.Header[:4] == b'\x13\x00\x00\x00':
 						# Win2016 TP4 decryption is different
 						pekIndex = cipherText.Header[4]
-						ctx = AES(self.__PEK[pekIndex], cipherMODE.CBC, IV=cipherText.KeyMaterial)
+						ctx = AES(self.__PEK[pekIndex], MODE_CBC, IV=cipherText.KeyMaterial)
 						plainText = ctx.decrypt(cipherText.EncryptedHash[4:])
 						haveInfo = True
 					else:
@@ -297,6 +297,7 @@ class NTDS:
 
 			return True, None
 		except Exception as e:
+			print(e)
 			return None, e
 
 	async def dump_secrets(self, only_ntlm = False, with_history = True):
@@ -321,11 +322,10 @@ class NTDS:
 
 				if len(record) != 0 and record[NAME_TO_INTERNAL['sAMAccountType']] in ACCOUNT_TYPES and NAME_TO_INTERNAL['objectSid'] in record:
 					secret = UserSecrets()
-					hash, err = self.__decrypt_hash(secret, record, db_cursor, with_history)
+					_, err = self.__decrypt_hash(secret, record, db_cursor, with_history)
 					if err is not None:
-						yield None, None
-						continue
-						#raise err
+						raise err
+					
 					if NAME_TO_INTERNAL['supplementalCredentials'] in record:
 						_, err = self.__decryptSupplementalInfo(secret, record)
 						if err is not None:
@@ -338,4 +338,5 @@ class NTDS:
 					yield None, None
 
 		except Exception as e:
+			print(e)
 			yield None, e

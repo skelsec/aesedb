@@ -1,4 +1,4 @@
-
+import itertools
 class UserSecrets:
 	def __init__(self):
 		self.domain = None
@@ -25,7 +25,7 @@ class UserSecrets:
 
 		t['object_sid'] = str(self.object_sid)
 		t['pwd_last_set'] = str(self.pwd_last_set)
-		t['user_account_status'] = str(self.user_account_status)
+		t['user_account_control'] = str(self.user_account_control)
 		
 		t['lm_history'] = []
 		for i, lm in enumerate(self.lm_history):
@@ -47,11 +47,15 @@ class UserSecrets:
 		return t
 	def __str__(self):
 		t = ''
-		t += ':'.join(['ntlm', str(self.domain),str(self.username),str(self.user_account_status),str(self.object_sid),self.lm_hash.hex(), self.nt_hash.hex(),str(self.pwd_last_set)])
+		t += ':'.join(['ntlm', str(self.domain),str(self.username),str(self.user_account_control),str(self.object_sid),self.lm_hash.hex(), self.nt_hash.hex(),str(self.pwd_last_set)])
 		t += '\r\n'
-		for i, x in enumerate(zip(self.lm_history,self.nt_history)):
+		for i, x in enumerate(itertools.zip_longest(self.lm_history[1:],self.nt_history[1:])):
 			lm, nt = x
-			t += ':'.join(['ntlm_history', str(self.domain),str(self.username),str(self.user_account_status),str(self.object_sid), lm.hex(), nt.hex(), 'history_%d'% (i+1) ])
+			if lm is None:
+				lm = bytes.fromhex('aad3b435b51404eeaad3b435b51404ee')
+			if nt is None:
+				nt = bytes.fromhex('31d6cfe0d16ae931b73c59d7e0c089c0')
+			t += ':'.join(['ntlm_history', str(self.domain),str(self.username),str(self.user_account_control),str(self.object_sid), lm.hex(), nt.hex(), 'history_%d'% (i) ])
 			t += '\r\n'
 		for ktype, key in self.kerberos_keys:
 			t += ':'.join(['kerberos',str(self.domain),str(self.username),str(self.object_sid),ktype,key.hex()])
