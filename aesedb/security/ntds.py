@@ -300,7 +300,7 @@ class NTDS:
 			print(e)
 			return None, e
 
-	async def dump_secrets(self, only_ntlm = False, with_history = True):
+	async def dump_secrets(self, only_ntlm = False, with_history = True, ignore_errors = True):
 		try:
 			_, err = await self.get_pek()
 			if err is not None:
@@ -324,12 +324,15 @@ class NTDS:
 					secret = UserSecrets()
 					_, err = self.__decrypt_hash(secret, record, db_cursor, with_history)
 					if err is not None:
-						raise err
+						if ignore_errors is False:
+							raise err
+						continue
 					
 					if NAME_TO_INTERNAL['supplementalCredentials'] in record:
 						_, err = self.__decryptSupplementalInfo(secret, record)
-						if err is not None:
+						if ignore_errors is False:
 							raise err
+						continue
 				
 					yield secret, None
 					continue

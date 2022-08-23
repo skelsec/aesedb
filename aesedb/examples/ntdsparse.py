@@ -25,13 +25,19 @@ class NTDSParserConsole:
 			if self.outfile_handle is not None:
 				res = ''
 				for secret in self.buffer:
-					res += str(secret)
+					try:
+						res += str(secret)
+					except:
+						continue
 
 				self.outfile_handle.write(res)
 
 			else:
-				for secret in self.buffer:			
-					print(str(secret))
+				for secret in self.buffer:
+					try:
+						print(str(secret))
+					except:
+						continue
 			
 			self.buffer = []
 			return True, None
