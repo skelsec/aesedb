@@ -1,6 +1,7 @@
 
 import asyncio
 from collections import OrderedDict
+import traceback
 from unicrypto.symmetric import RC4, AES, DES, MODE_CBC, MODE_ECB, deriveKey
 from unicrypto.hashlib import md5
 
@@ -267,7 +268,7 @@ class NTDS:
 				# On some old w2k3 there might be user properties that don't
 				# match [MS-SAMR] structure, discarding them
 				return True, None
-
+			
 			for userprop in userProperties.UserProperties:
 				if userprop.PropertyName == 'Primary:Kerberos-Newer-Keys':
 					propertyValueBuffer = bytes.fromhex(userprop.PropertyValue.decode())
@@ -294,10 +295,9 @@ class NTDS:
 					except UnicodeDecodeError:
 						# This could be because we're decoding a machine password. Printing it hex
 						secret.cleartext_pwds.append(userprop.PropertyValue.decode('utf-8'))
-
+			
 			return True, None
 		except Exception as e:
-			print(e)
 			return None, e
 
 	async def dump_secrets(self, only_ntlm = False, with_history = True, ignore_errors = True):
@@ -330,10 +330,10 @@ class NTDS:
 					
 					if NAME_TO_INTERNAL['supplementalCredentials'] in record:
 						_, err = self.__decryptSupplementalInfo(secret, record)
-						if ignore_errors is False:
-							raise err
-						continue
-				
+						if err is not None:
+							if ignore_errors is False:
+								raise err
+							
 					yield secret, None
 					continue
 				else:
@@ -341,5 +341,4 @@ class NTDS:
 					yield None, None
 
 		except Exception as e:
-			print(e)
 			yield None, e

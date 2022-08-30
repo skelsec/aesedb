@@ -8,43 +8,32 @@ from aiowinreg.ahive import AIOWinRegHive
 from aesedb import logger
 
 class NTDSParserConsole:
-	def __init__(self, bootkey, ntdsfile, show_progress = True, outfile = None, ext_result_q = None, count_total = True):
+	def __init__(self, bootkey, ntdsfile, ignore_errors = True, with_history = True):
 		self.bootkey = bootkey
 		self.ntdsfile = ntdsfile
-		self.show_progress = show_progress
-		self.outfile = outfile
-		self.ext_result_q = ext_result_q
-		self.count_total = count_total
-		self.buffer_size = 100
-		self.buffer = []
+		self.ignore_errors = ignore_errors
+		self.with_history = with_history
 
-		self.outfile_handle = None
-	
-	async def flush_buffer(self):
-		try:
-			if self.outfile_handle is not None:
-				res = ''
-				for secret in self.buffer:
-					try:
-						res += str(secret)
-					except:
-						continue
+	async def get_total_rows(self):
+		logger.debug('Fetching total row count...')
+		file = self.ntdsfile
+		if isinstance(self.ntdsfile, str):
+			file = AFile(self.ntdsfile)
 
-				self.outfile_handle.write(res)
-
-			else:
-				for secret in self.buffer:
-					try:
-						print(str(secret))
-					except:
-						continue
+		db = ESENT_DB(file)
+		_, err = await db.parse()
+		if err is not None:
+			raise err
 			
-			self.buffer = []
-			return True, None
-		except Exception as e:
-			return None, e
+		total = 1
+		total, err = await db.get_rowcnt('datatable')
+		if err is not None:
+			raise err
 
-	async def run(self):
+		logger.debug('Total row count done! %s' % total)
+		return total
+
+	async def get_secrets(self):
 		try:
 			hexkey = False
 			if isinstance(self.bootkey, str) and len(self.bootkey) == 32:
@@ -71,60 +60,38 @@ class NTDSParserConsole:
 			if err is not None:
 				raise err
 			
-			total = 1
-			if self.count_total is True:
-				logger.debug('Fetching total row count')
-				total, err = await db.get_rowcnt('datatable')
-				if err is not None:
-					raise err
-			
-			ntds = NTDS(db, bootkey)
-			if self.show_progress is True:
-				pbar     = tqdm(desc='JET table parsing ', total=total, unit='records', miniters= total//200 ,position=0)
-				pbar_sec = tqdm(desc='User secrets found', unit = '', miniters=self.buffer_size//10 ,position=1)
-
-			if self.outfile is not None:
-				self.outfile_handle = open(self.outfile, 'w', newline = '')
-			
+			ntds = NTDS(db, bootkey)			
 			logger.debug('Dumping secrets')
-			async for secret, err in ntds.dump_secrets():
-				if err is not None:
-					raise err
-
-				if self.show_progress is True:
-					pbar.update()
-				
-				if self.ext_result_q is not None:
-					await self.ext_result_q.put((secret, total, None, False)) # secret, total, error, end
-				
-				if secret is None:
-					continue
-				
-				if self.show_progress is True:
-					pbar_sec.update()
-				
-				if self.ext_result_q is None:
-					self.buffer.append(secret)
-					if len(self.buffer) > self.buffer_size:
-						_, err = await self.flush_buffer()
-						if err is not None:
-							raise err
-
-			if self.ext_result_q is None:
-				_, err = await self.flush_buffer()
-				if err is not None:
-					raise err
+			async for secret, err in ntds.dump_secrets(with_history=self.with_history, ignore_errors = self.ignore_errors):
+				yield secret, err
 			
-			else:
-				await self.ext_result_q.put((None, total, None, True))
-
-			return True, None
 		except Exception as e:
-			if self.ext_result_q is not None:
-				await self.ext_result_q.put((None, None, e, True)) # secret, error, end
-			return None, e
+			yield None, e
 
-def main():
+async def flush_buffer(buffer, outfile_handle = None):
+	try:
+		if outfile_handle is not None:
+			res = ''
+			for secret in buffer:
+				try:
+					res += str(secret)
+				except:
+					continue
+			outfile_handle.write(res)
+		else:
+			for secret in buffer:
+				try:
+					print(str(secret))
+				except:
+					continue
+		
+		buffer = []
+		return True, None
+	except Exception as e:
+		return None, e
+
+
+async def amain():
 	import argparse
 	import traceback
 	try:
@@ -132,6 +99,8 @@ def main():
 		parser.add_argument('-v', '--verbose', action='count', default=0)
 		parser.add_argument('-p', '--progress', action='store_true', help='Show progress bar')
 		parser.add_argument('-o', '--out-file', help='Output file path.')
+		parser.add_argument('--strict', action='store_true', help='Strict parsing. Fails on errors')
+		parser.add_argument('--no-history', action='store_true', help='Do not parse history')
 		parser.add_argument('bootkey',  help='Bootkey OR path to the SYSTEM hive file')
 		parser.add_argument('ntdsfile', help='NTDS.dit file path')
 
@@ -140,16 +109,55 @@ def main():
 		ntdscon = NTDSParserConsole(
 			args.bootkey,
 			args.ntdsfile,
-			show_progress = args.progress,
-			outfile = args.out_file,
-			ext_result_q = None
+			ignore_errors=args.strict,
+			with_history=not args.no_history
 		)
 
-		_, err = asyncio.run(ntdscon.run())
+		buffer = []
+		buffer_size = 1000
+		total = await ntdscon.get_total_rows()
+		if args.progress is True:
+			pbar     = tqdm(desc='JET table parsing ', total=total, unit='records', miniters= total//200 ,position=0)
+			pbar_sec = tqdm(desc='User secrets found', unit = '', miniters=buffer_size//10 ,position=1)
+
+		outfile_handle = None
+		if args.out_file is not None:
+			outfile_handle = open(args.out_file, 'w', newline = '')
+
+		async for secret, err in ntdscon.get_secrets():
+			if err is not None:
+				raise err
+
+			if args.progress is True:
+				pbar.update()
+				
+			if secret is None:
+				continue
+				
+			if args.progress is True:
+				pbar_sec.update()
+				
+
+			buffer.append(secret)
+			if len(buffer) > buffer_size:
+				_, err = await flush_buffer(buffer, outfile_handle)
+				buffer = []
+				if err is not None:
+					raise err
+
+			
+		_, err = await flush_buffer(buffer, outfile_handle)
+		buffer = []
 		if err is not None:
 			raise err
+			
+		
 	except Exception as e:
 		traceback.print_exc()
+
+
+def main():
+	asyncio.run(amain())
 
 if __name__ == '__main__':
 	main()
