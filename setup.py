@@ -46,7 +46,7 @@ setup(
 	## these are only necessary for the command line tool
 	## lib can work without additional deps
 	install_requires=[
-		'unicrypto>=0.0.5',
+		'unicrypto>=0.0.9',
 		'aiowinreg>=0.0.7',
 		'tqdm',
 		'colorama',

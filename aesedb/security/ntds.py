@@ -172,7 +172,7 @@ class NTDS:
 				encryptedLMHash = CRYPTED_HASH.from_bytes(record[NAME_TO_INTERNAL['dBCSPwd']])
 				if encryptedLMHash.Header[:4] == b'\x13\x00\x00\x00':
 					# Win2016 TP4 decryption is different
-					encryptedLMHash = CRYPTED_HASHW16(record[NAME_TO_INTERNAL['dBCSPwd']])
+					encryptedLMHash = CRYPTED_HASHW16.from_bytes(record[NAME_TO_INTERNAL['dBCSPwd']])
 					pekIndex = encryptedLMHash.Header[4]
 					ctx = AES(self.__PEK[pekIndex], MODE_CBC, IV=encryptedLMHash.KeyMaterial)
 					dec_hash_temp = ctx.decrypt(encryptedLMHash.EncryptedHash[:16])
