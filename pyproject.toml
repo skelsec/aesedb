@@ -1,0 +1,36 @@
+
+[build-system]
+requires = [
+    "setuptools",
+]
+
+[project]
+name = "aesedb"
+description = "NTDS parser toolkit"
+requires-python = ">=3.6"
+license = {text = "MIT"}
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.6",
+]
+dependencies = [
+    "prompt-toolkit >= 3.0.2",
+    "unicrypto>=0.0.9",
+	"aiowinreg>=0.0.8",
+	"tqdm",
+	"colorama",
+]
+authors = [
+    {name = "Tamas Jos", email = "skelsec@skelsecprojects.com"},
+]
+dynamic = ["version", "readme"]
+
+[tool.setuptool.dynamic.entry-points]
+console-scripts = [
+    "antdsparse = aesedb.examples.ntdsparse:main"
+]
+
+[tool.setuptools.dynamic]
+version = {attr = "aesedb._version.__version__"}
+readme = {file = ["README.md"]}

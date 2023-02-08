@@ -50,7 +50,6 @@ setup(
 		'aiowinreg>=0.0.7',
 		'tqdm',
 		'colorama',
-		'pycryptodomex',
 	],
 
 	entry_points={
