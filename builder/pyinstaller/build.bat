@@ -4,17 +4,17 @@ set root=%~dp0
 set projectname=aesedb
 set repo=%root%..\..\%projectname%
 IF NOT DEFINED __BUILDALL_VENV__ (
-    set pyenv=%root%\env
-    python -m venv %pyenv%
-    %pyenv%\Scripts\activate.bat &^
-    pip install pyinstaller
-)&^
+set pyenv=%root%\env
+python -m venv %pyenv%
+%pyenv%\Scripts\activate.bat &^
+pip install pyinstaller
+) &^
 cd %repo%\..\ &^
 pip install . &^
 cd %repo%\examples &^
 pyinstaller -F ntdsparse.py %hiddenimports% &^
 cd %repo%\examples\dist & copy ntdsparse.exe %root%\ntdsparse.exe &^
 IF NOT DEFINED __BUILDALL_VENV__ (
-    deactivate
-)&^
+deactivate
+) &^
 cd %root%
