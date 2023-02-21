@@ -3,16 +3,24 @@ set hiddenimports= --hidden-import cryptography --hidden-import cffi --hidden-im
 set root=%~dp0
 set projectname=aesedb
 set repo=%root%..\..\%projectname%
-IF NOT DEFINED __BUILDALL_VENV__ (
+IF NOT DEFINED __BUILDALL_VENV__ (GOTO :CREATEVENV)
+GOTO :BUILD
+
+:CREATEVENV
 python -m venv %root%\env
-%root%\env\Scripts\activate.bat &^
-pip install pyinstaller ) &^
-cd %repo%\..\ &^
-pip install . &^
-cd %repo%\examples &^
-pyinstaller -F ntdsparse.py %hiddenimports% &^
-cd %repo%\examples\dist & copy ntdsparse.exe %root%\ntdsparse.exe &^
-IF NOT DEFINED __BUILDALL_VENV__ (
-deactivate
-) &^
+CALL %root%\env\Scripts\activate.bat
+pip install pyinstaller
+GOTO :BUILD
+
+:BUILD
+cd %repo%\..\
+pip install .
+cd %repo%\examples
+pyinstaller -F ntdsparse.py %hiddenimports%
+cd %repo%\examples\dist & copy ntdsparse.exe %root%\ntdsparse.exe
+GOTO :CLEANUP
+
+:CLEANUP
+IF NOT DEFINED __BUILDALL_VENV__ (deactivate)
 cd %root%
+EXIT /B
