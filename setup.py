@@ -33,7 +33,7 @@ setup(
 
 	zip_safe=True,
 	#
-	# license="LICENSE.txt",
+	license="Modified Apache Software License 1.1",
 	description="NTDS parser toolkit",
 
 	# long_description=open("README.txt").read(),
