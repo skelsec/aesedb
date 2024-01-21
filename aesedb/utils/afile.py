@@ -12,7 +12,7 @@ class AFile:
 	async def read(self, n = -1):
 		return self.fd.read(n)
 	
-	def tell(self):
+	async def tell(self):
 		return self.fd.tell()
 	
 	async def close(self):

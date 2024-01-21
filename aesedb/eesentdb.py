@@ -98,7 +98,8 @@ class ESENT_DB:
 			#print(self.__DBHeader)
 			self.__pageSize = self.__DBHeader.PageSize
 			await self.__DB.seek(0,2)
-			self.__totalPages = (self.__DB.tell() // self.__pageSize) -2
+			pos = await self.__DB.tell()
+			self.__totalPages = (pos // self.__pageSize) -2
 			#print("Database Version:0x%x, Revision:0x%x"% (self.__DBHeader.Version, self.__DBHeader.FileFormatRevision))
 			#print("Page Size: %d" % self.__pageSize)
 			#print("Total Pages in file: %d" % self.__totalPages)
