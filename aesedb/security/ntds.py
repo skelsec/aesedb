@@ -1,11 +1,10 @@
 
 import asyncio
 from collections import OrderedDict
-import traceback
 from unicrypto.symmetric import RC4, AES, DES, MODE_CBC, MODE_ECB, deriveKey
 from unicrypto.hashlib import md5
 
-from aesedb.security.constants import NAME_TO_INTERNAL, ACCOUNT_TYPES, KERBEROS_TYPE
+from aesedb.security.constants import NAME_TO_INTERNAL, ACCOUNT_TYPES, KERBEROS_TYPE, INTERNAL_TO_NAME
 from aesedb.security.structures.pek import PEKLIST_ENC, PEK_KEY, PEKLIST_PLAIN
 from aesedb.security.structures.crypted import CRYPTED_HASH, CRYPTED_HASHW16, CRYPTED_HISTORY, CRYPTED_BLOB
 from aesedb.security.structures.userprops import USER_PROPERTIES
@@ -156,6 +155,20 @@ class NTDS:
 			dt = datetime.datetime.fromtimestamp(t)
 			return dt.strftime("%Y-%m-%d %H-%M")
 	
+	def resolve_record_names(self, record):
+		names_to_delete = []
+		names_to_add = {}
+		for name in record:
+			value = record[name]
+			if name in INTERNAL_TO_NAME:
+				names_to_add[INTERNAL_TO_NAME[name]] = value
+				names_to_delete.append(name)
+		for name in names_to_delete:
+			del record[name]
+		for name in names_to_add:
+			record[name] = names_to_add[name]
+		return record
+	
 	def __decrypt_hash(self, secret: UserSecrets, record, db_cursor, with_history = True):
 		try:
 			try:
@@ -241,6 +254,7 @@ class NTDS:
 
 	def __decryptSupplementalInfo(self, secret: UserSecrets, record):
 		try:
+			plainText = None
 			haveInfo = False
 			if record[NAME_TO_INTERNAL['supplementalCredentials']] is not None:
 				if len(record[NAME_TO_INTERNAL['supplementalCredentials']]) > 24:
@@ -257,7 +271,7 @@ class NTDS:
 			
 			
 			if haveInfo is False:
-				return True, None
+				return plainText, None
 			
 
 			### woohooo we have info!
@@ -296,7 +310,7 @@ class NTDS:
 						# This could be because we're decoding a machine password. Printing it hex
 						secret.cleartext_pwds.append(userprop.PropertyValue.decode('utf-8'))
 			
-			return True, None
+			return plainText, None
 		except Exception as e:
 			return None, e
 
@@ -321,6 +335,7 @@ class NTDS:
 					return
 
 				if len(record) != 0 and record[NAME_TO_INTERNAL['sAMAccountType']] in ACCOUNT_TYPES and NAME_TO_INTERNAL['objectSid'] in record:
+					decryptedSupplementalInfo = None
 					secret = UserSecrets()
 					_, err = self.__decrypt_hash(secret, record, db_cursor, with_history)
 					if err is not None:
@@ -329,11 +344,10 @@ class NTDS:
 						continue
 					
 					if NAME_TO_INTERNAL['supplementalCredentials'] in record:
-						_, err = self.__decryptSupplementalInfo(secret, record)
+						decryptedSupplementalInfo, err = self.__decryptSupplementalInfo(secret, record)
 						if err is not None:
 							if ignore_errors is False:
 								raise err
-							
 					yield secret, None
 					continue
 				else:
