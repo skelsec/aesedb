@@ -35,8 +35,9 @@ class PAGEFLAGS(enum.IntEnum):
 
 
 class ESENT_PAGE:
-	def __init__(self, db):
+	def __init__(self, db, pageno):
 		self.db = db
+		self.pageno = pageno
 		self.data = None
 		self.record = None
 		self.tags = {} # tagno -> (flags, data)

@@ -124,7 +124,7 @@ class ESENT_DB:
 			if pageno <= 0 and force_parse is False:
 				return data, None
 			
-			page = ESENT_PAGE(self.__DBHeader)
+			page = ESENT_PAGE(self.__DBHeader, pageno)
 			_, err = await page.read(data)
 			if err is not None:
 				raise err
@@ -298,15 +298,16 @@ class ESENT_DB:
 		except Exception as e:
 			return None, e
 
-	async def get_rowcnt(self, table_name):
+	async def get_rowcnt(self, table_name, max_rows = None):
 		try:
 			cursor, err = await self.open_table(table_name)
 			if err is not None:
 				raise err
 			
 			ctr = 0
-			while True:
-				res, err = await self.__next_row_ctr(cursor)
+			pages = {}
+			while max_rows is None or ctr < max_rows:
+				res, err = await self.__next_row_ctr(cursor, pages=pages)
 				if err is not None:
 					raise err
 				if res is None:
@@ -318,8 +319,10 @@ class ESENT_DB:
 		except Exception as e:
 			return None, e
 	
-	async def __next_row_ctr(self, cursor):
+	async def __next_row_ctr(self, cursor, pages = None):
 		try:
+			if pages is None:
+				pages = {}
 			cursor['CurrentTag'] += 1
 			tag, err = await self.__get_next_tag(cursor)
 			if err is not None:
@@ -331,20 +334,28 @@ class ESENT_DB:
 				if page.record.NextPageNumber == 0:
 					# No more pages, chau
 					return None, None
+				elif page.record.NextPageNumber in pages:
+					# We've already seen this page, chau
+					#print('Circular reference detected, chau')
+					return None, None
 				else:
 					cursor['CurrentPageData'], err = await self.get_page(page.record.NextPageNumber)
 					if err is not None:
 						raise err
 					cursor['CurrentTag'] = 0
-					return await self.__next_row_ctr(cursor)
+					pages[page.record.NextPageNumber] = True
+					return await self.__next_row_ctr(cursor, pages=pages)
 			return True, None
 				
 
 		except Exception as e:
 			return None, e
 	
-	async def get_next_row(self, cursor, filter_col = None):
+	async def get_next_row(self, cursor, filter_col = None, pages_seen = None):
 		try:
+			if pages_seen is None:
+				pages_seen = {}
+			
 			cursor['CurrentTag'] += 1
 			#print('currenttag %s ' %cursor['CurrentTag'])
 			tag, err = await self.__get_next_tag(cursor)
@@ -358,12 +369,17 @@ class ESENT_DB:
 				if page.record.NextPageNumber == 0:
 					# No more pages, chau
 					return None, None
+				elif page.record.NextPageNumber in pages_seen:
+					# We've already seen this page, chau
+					#print('Circular reference detected, chau')
+					return None, None
 				else:
+					pages_seen[page.record.NextPageNumber] = True
 					cursor['CurrentPageData'], err = await self.get_page(page.record.NextPageNumber)
 					if err is not None:
 						raise err
 					cursor['CurrentTag'] = 0
-					return await self.get_next_row(cursor, filter_col = filter_col)
+					return await self.get_next_row(cursor, filter_col = filter_col, pages_seen = pages_seen)
 			else:
 				res, err = await self.__tag_to_record(cursor, tag.EntryData, filter_col)
 				if err is not None:
