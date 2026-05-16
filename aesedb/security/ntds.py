@@ -173,12 +173,20 @@ class NTDS:
 		try:
 			try:
 				sid = SAMR_RPC_SID.from_bytes(record[NAME_TO_INTERNAL['objectSid']])
+				# str(sid) is intentionally the "decryption-friendly" form
+				# (all sub-auths big-endian) so the trailing token matches
+				# the RID that AD used to derive the DES key. Do not change
+				# this without also revisiting SAMR_RPC_SID.__str__.
 				rid = str(sid).split('-')[-1]
 			except Exception as e:
 				print('SID parsing failed!')
 				print('Data inpuit: %s' % record[NAME_TO_INTERNAL['objectSid']].hex())
 				raise e
-			secret.object_sid = sid
+			# Store the canonical SID string for downstream consumers
+			# (UserSecrets.to_dict / octopwn parsers). formatCanonical
+			# mixes byte orders to match the LDAP/winacl representation
+			# of the same principal.
+			secret.object_sid = sid.formatCanonical()
 			#secret.rid = rid
 
 			if record[NAME_TO_INTERNAL['dBCSPwd']] is not None:

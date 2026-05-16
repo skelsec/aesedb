@@ -14,7 +14,6 @@ class NTDSParserConsole:
 		self.ntdsfile = ntdsfile
 		self.ignore_errors = ignore_errors
 		self.with_history = with_history
-		self.__sids = {}
 
 	async def get_total_rows(self, max_rows = None):
 		logger.debug('Fetching total row count...')
@@ -65,11 +64,6 @@ class NTDSParserConsole:
 			ntds = NTDS(db, bootkey)			
 			logger.debug('Dumping secrets')
 			async for secret, err in ntds.dump_secrets(with_history=self.with_history, ignore_errors = self.ignore_errors):
-				if secret is not None and err is None:
-					if secret.object_sid not in self.__sids:
-						self.__sids[secret.object_sid] = True
-					else:
-						raise Exception('Duplicate SID found!')
 				yield secret, err
 			
 		except Exception as e:
